@@ -17,17 +17,17 @@ AREA = config["animator"]["area"]
 
 
 class Animator:
-    def __init__(self, num_flame, tpv=False):
+    def __init__(self, num_flame, tpv=False, hold=False):
         self.offset = LENGTH - WB + WHEEL_LEN / 2
         self.num_flame = num_flame
         self.tpv = tpv  # third person view
 
-    def plot(self, frame, path, steer=0.0, truckcolor="-w"):
+    def plot(self, frame, state, path, steer=0.0, truckcolor="-w"):
         # 前輪中心の座標での各パーツ座標を計算
-        x = self.history[:, 0][frame] - self.offset * math.cos(self.history[:, 2][frame])
-        y = self.history[:, 1][frame] - self.offset * math.sin(self.history[:, 2][frame])
-        yaw = self.history[:, 2][frame]
-        caster_angle = self.history[:, 3][frame] + yaw
+        x = state[:, 0][frame] - self.offset * math.cos(state[:, 2][frame])
+        y = state[:, 1][frame] - self.offset * math.sin(state[:, 2][frame])
+        yaw = state[:, 2][frame]
+        caster_angle = state[:, 3][frame] + yaw
         outline = np.array(
             [
                 [-BACKTOWHEEL, (LENGTH - BACKTOWHEEL), (LENGTH - BACKTOWHEEL), -BACKTOWHEEL, -BACKTOWHEEL],
@@ -100,14 +100,12 @@ class Animator:
             self.ax.plot(np.array(fl_wheel[1, :]).flatten(), np.array(fl_wheel[0, :]).flatten(), truckcolor)
         )
         artists.extend(self.ax.plot(np.array(c_wheel[1, :]).flatten(), np.array(c_wheel[0, :]).flatten(), truckcolor))
-        artists.extend(
-            self.ax.plot(self.history[:, 1][:frame], self.history[:, 0][:frame], "b-o", label="Robot path", zorder=0)
-        )
+        artists.extend(self.ax.plot(state[:, 1][:frame], state[:, 0][:frame], "b-o", label="Robot path", zorder=0))
         artists.extend(self.ax.plot(path[0], path[1], "r--", label="Reference path", zorder=1))
-        self.set_figarea(frame=frame)
+        self.set_figarea(frame=frame, state=state)
         return artists
 
-    def set_figarea(self, frame):
+    def set_figarea(self, frame, state):
         if self.tpv:
             mergin = 1.2
             min_x = np.min(self.trajectory[:, 0])
@@ -120,12 +118,19 @@ class Animator:
             self.ax.set_xlim(-area + center_y, area + center_y)
             self.ax.set_ylim(-area + center_x, area + center_x)
         else:
-            self.ax.set_xlim(self.history[:, 1][frame] - AREA, self.history[:, 1][frame] + AREA)
-            self.ax.set_ylim(self.history[:, 0][frame] - AREA, self.history[:, 0][frame] + AREA)
+            self.ax.set_xlim(state[:, 1][frame] - AREA, state[:, 1][frame] + AREA)
+            self.ax.set_ylim(state[:, 0][frame] - AREA, state[:, 0][frame] + AREA)
 
     def update(self, frame):
         self.ax.cla()
-        artists = self.plot(frame=frame, path=[self.trajectory[:, 1], self.trajectory[:, 0]])
+        artists = self.plot(frame=frame, state=self.robot_state, path=[self.trajectory[:, 1], self.trajectory[:, 0]])
+        if not self.trajectory2 is None:
+            artists = self.plot(
+                frame=frame,
+                state=self.robot_state2,
+                path=[self.trajectory2[:, 1], self.trajectory2[:, 0]],
+                truckcolor="-c",
+            )
         self.ax.set_aspect("equal")
         self.ax.set_facecolor("black")
         self.ax.invert_xaxis()
@@ -133,9 +138,11 @@ class Animator:
         self.ax.grid()
         return artists
 
-    def generate(self, history, trajectory, filename, fps=25):
-        self.history = history
+    def generate(self, history, trajectory, filename, history2=None, trajectory2=None, fps=25):
+        self.robot_state = history
         self.trajectory = trajectory
+        self.robot_state2 = history2 if not history2 is None else None
+        self.trajectory2 = trajectory2 if not trajectory2 is None else None
         self.fig, self.ax = plt.subplots()
         self.ax.set_aspect("equal")
         ani = FuncAnimation(self.fig, self.update, frames=self.num_flame, blit=True)
