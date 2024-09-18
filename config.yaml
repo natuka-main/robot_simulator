@@ -1,0 +1,11 @@
+animator:
+  length: 0.7             # [m]
+  width: 0.5              # [m]
+  back_to_wheel: 0.2      # [m]
+  wheel_len: 0.08         # [m]
+  wheel_width: 0.03       # [m]
+  tread: 0.2              # [m]
+  wheel_base: 0.4         # [m]
+  area: 1                 # [m]
+
+
